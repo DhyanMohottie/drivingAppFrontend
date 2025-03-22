@@ -16,6 +16,7 @@ import Home from './Pages/Home';
 // import UpdateLicensePkg from './Pages/UpdatePackage';
 import ScrollToTop from './Components/ScrollToTop';
 import AdminDashboard from './Pages/admin/AdminDashboard';
+import UserDashboard from './Pages/user/UserDashboard';
 // import PhysicalTrainingHome from './Pages/PhysicalTrainingHome';
 // import QuizMain from './Pages/QuizMain';
 // import ViewQuiz from './Components/ViewQuiz';
@@ -34,6 +35,7 @@ export default function App() {
           <Routes>
             <Route path='/' element={<Home />} />
             <Route path='/admin' element={<AdminDashboard/>} />
+            <Route path='/user' element={<UserDashboard/>} />
             {/* 
             <Route path='/sign-in' element={<SignIn />} />
             <Route path='/user/sign-in' element={<UserLogin />} />
