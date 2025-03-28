@@ -17,6 +17,9 @@ import Home from './Pages/Home';
 import ScrollToTop from './Components/ScrollToTop';
 import AdminDashboard from './Pages/admin/AdminDashboard';
 import UserDashboard from './Pages/user/UserDashboard';
+import LoginPage from './Pages/LoginPage';
+import RegistrationPage from './Pages/RegistrationPage';
+import TeacherDashboard from './Pages/teacher/Teacher-Dashboard';
 // import PhysicalTrainingHome from './Pages/PhysicalTrainingHome';
 // import QuizMain from './Pages/QuizMain';
 // import ViewQuiz from './Components/ViewQuiz';
@@ -33,9 +36,12 @@ export default function App() {
         {/* <ScrollToTop /> */}
         {/* <Header /> */}
           <Routes>
-            <Route path='/' element={<Home />} />
+            {/* <Route path='/' element={<Home />} /> */}
             <Route path='/admin' element={<AdminDashboard/>} />
             <Route path='/user' element={<UserDashboard/>} />
+            <Route path='/login' element={<LoginPage/>} />
+            <Route path='/register' element={<RegistrationPage/>} />
+            <Route path='/teacher' element={<TeacherDashboard/>} />
             {/* 
             <Route path='/sign-in' element={<SignIn />} />
             <Route path='/user/sign-in' element={<UserLogin />} />
