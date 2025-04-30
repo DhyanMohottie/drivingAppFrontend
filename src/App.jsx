@@ -2,7 +2,6 @@ import './App.css'
 
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Header from './Components/Header';
-import Home from './Pages/Home';
 // import SignIn from './Pages/SignIn';
 // import SignUp from './Pages/SignUp';
 // import AdminDashboard from './Pages/AdminDashboard';
