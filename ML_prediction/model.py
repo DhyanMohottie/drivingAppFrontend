@@ -16,10 +16,8 @@ df.drop_duplicates(inplace=True)
 df['Time'] = pd.to_datetime(df['Time'], format='%H:%M').dt.hour
 
 
-encoder = LabelEncoder()
-df['Weather'] = encoder.fit_transform(df['Weather'])
 
-X=df.drop(columns=['Participants'])
+X=df.drop(columns=['Participants','Weather'])
 y=df['Participants']
 X_train,X_test,y_train,y_test=train_test_split(X,y,test_size=0.2)
 
