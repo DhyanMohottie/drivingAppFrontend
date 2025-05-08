@@ -10,6 +10,7 @@ const TeacherDashboard = () => {
   const [showAvailabilityForm, setShowAvailabilityForm] = useState(false);
   const [showStudentsList, setShowStudentsList] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
+  
 
   // Mock teacher data
   const [teacherData, setTeacherData] = useState({
@@ -36,6 +37,7 @@ const TeacherDashboard = () => {
 
   const [predictedAttendance, setPredictedAttendance] = useState(null);
   const [predictionLoading, setPredictionLoading] = useState(false);
+
 
   useEffect(() => {
     const fetchPrediction = async () => {
@@ -971,6 +973,7 @@ const TeacherDashboard = () => {
                           )}
                         </div>
 
+
                         <div className="flex-1">
                           <label className="block text-sm font-medium text-blue-700 mb-1">
                             Predicted Attendance
@@ -994,8 +997,21 @@ const TeacherDashboard = () => {
                             )}
                           </div>
                         </div>
-                      </div>
 
+
+                        <div className="flex items-end">
+                          <a
+                            href="/huge_student_participation_dataset.csv"
+                            download="student_participation.csv"
+                            className="inline-flex items-center h-10 px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-md shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                          >
+                            <FileText className="mr-2 h-4 w-4" />
+                            Generate Report
+                          </a>
+
+
+                        </div>
+                      </div>
 
 
 

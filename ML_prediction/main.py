@@ -1,5 +1,6 @@
 import pickle
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import Response, FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 import pandas as pd
 
@@ -29,3 +30,4 @@ async def predict_attendance(start_time: str):
         return {"predicted_attendance": int(round(prediction))}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
+
