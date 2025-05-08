@@ -10,7 +10,7 @@ const TeacherDashboard = () => {
   const [showAvailabilityForm, setShowAvailabilityForm] = useState(false);
   const [showStudentsList, setShowStudentsList] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState(null);
-  
+
   // Mock teacher data
   const [teacherData, setTeacherData] = useState({
     InstructorID: 'I001',
@@ -22,7 +22,7 @@ const TeacherDashboard = () => {
     status: 'Available',
     students: 28
   });
-  
+
   // Session form state
   const [sessionForm, setSessionForm] = useState({
     title: '',
@@ -33,10 +33,39 @@ const TeacherDashboard = () => {
     maxStudents: 5,
     description: '',
   });
+
+  const [predictedAttendance, setPredictedAttendance] = useState(null);
+  const [predictionLoading, setPredictionLoading] = useState(false);
+
+  useEffect(() => {
+    const fetchPrediction = async () => {
+      if (sessionForm.startTime) {
+        try {
+          setPredictionLoading(true);
+          const res = await fetch(
+            `http://localhost:8000/predict_attendance/?start_time=${encodeURIComponent(sessionForm.startTime)}`
+          );
+          const data = await res.json();
+          setPredictedAttendance(data.predicted_attendance);
+        } catch (error) {
+          console.error("Prediction error:", error);
+          setPredictedAttendance(null);
+        } finally {
+          setPredictionLoading(false);
+        }
+      } else {
+        setPredictedAttendance(null);
+      }
+    };
   
+    fetchPrediction();
+  }, [sessionForm.startTime]);
+
+
+
   // Session form errors
   const [sessionErrors, setSessionErrors] = useState({});
-  
+
   // Availability form state
   const [availabilityForm, setAvailabilityForm] = useState({
     monday: { isAvailable: true, startTime: '09:00', endTime: '17:00' },
@@ -51,7 +80,7 @@ const TeacherDashboard = () => {
     vacationEnd: '',
     vacationNote: ''
   });
-  
+
   // Mock sessions data
   const [sessions, setSessions] = useState([
     {
@@ -123,7 +152,7 @@ const TeacherDashboard = () => {
       ]
     }
   ]);
-  
+
   // Mock students data
   const [students, setStudents] = useState([
     {
@@ -177,34 +206,34 @@ const TeacherDashboard = () => {
       averageScore: null
     }
   ]);
-  
+
   // Session form validation
   const validateSessionForm = () => {
     const errors = {};
-    
+
     if (!sessionForm.title) errors.title = 'Session title is required';
     if (!sessionForm.date) errors.date = 'Date is required';
     if (!sessionForm.startTime) errors.startTime = 'Start time is required';
     if (!sessionForm.endTime) errors.endTime = 'End time is required';
     if (!sessionForm.location) errors.location = 'Location is required';
-    
+
     if (sessionForm.startTime && sessionForm.endTime) {
       const start = new Date(`2000-01-01T${sessionForm.startTime}`);
       const end = new Date(`2000-01-01T${sessionForm.endTime}`);
-      
+
       if (start >= end) {
         errors.endTime = 'End time must be after start time';
       }
     }
-    
+
     if (sessionForm.maxStudents < 1) {
       errors.maxStudents = 'Must allow at least 1 student';
     }
-    
+
     setSessionErrors(errors);
     return Object.keys(errors).length === 0;
   };
-  
+
   // Session form handlers
   const handleSessionChange = (e) => {
     const { name, value, type } = e.target;
@@ -213,7 +242,7 @@ const TeacherDashboard = () => {
       [name]: type === 'number' ? parseInt(value) : value
     });
   };
-  
+
   // Availability form handlers
   const handleAvailabilityChange = (day, field, value) => {
     setAvailabilityForm({
@@ -224,7 +253,7 @@ const TeacherDashboard = () => {
       }
     });
   };
-  
+
   const handleVacationChange = (e) => {
     const { name, value, type, checked } = e.target;
     setAvailabilityForm({
@@ -232,15 +261,15 @@ const TeacherDashboard = () => {
       [name]: type === 'checkbox' ? checked : value
     });
   };
-  
+
   // Create or update session
   const handleSessionSubmit = (e) => {
     e.preventDefault();
-    
+
     if (validateSessionForm()) {
       if (isEditingSession) {
         // Update existing session
-        setSessions(sessions.map(session => 
+        setSessions(sessions.map(session =>
           session.id === currentSessionId ? {
             ...session,
             title: sessionForm.title,
@@ -267,10 +296,10 @@ const TeacherDashboard = () => {
           description: sessionForm.description,
           enrolledStudents: []
         };
-        
+
         setSessions([...sessions, newSession]);
       }
-      
+
       // Reset form and state
       setSessionForm({
         title: '',
@@ -286,7 +315,7 @@ const TeacherDashboard = () => {
       setCurrentSessionId(null);
     }
   };
-  
+
   // Edit session
   const handleEditSession = (sessionId) => {
     const session = sessions.find(s => s.id === sessionId);
@@ -306,28 +335,28 @@ const TeacherDashboard = () => {
       setActiveSection('sessions');
     }
   };
-  
+
   // Cancel session
   const handleCancelSession = (sessionId) => {
     const session = sessions.find(s => s.id === sessionId);
     if (session && session.status !== 'Completed') {
       if (window.confirm(`Are you sure you want to cancel the session "${session.title}"?`)) {
-        setSessions(sessions.map(s => 
+        setSessions(sessions.map(s =>
           s.id === sessionId ? { ...s, status: 'Cancelled' } : s
         ));
       }
     }
   };
-  
+
   // Save availability settings
   const handleAvailabilitySubmit = (e) => {
     e.preventDefault();
-    
+
     // Here you would normally send the availability data to your API
     alert('Availability settings saved successfully!');
     setShowAvailabilityForm(false);
   };
-  
+
   // Toggle teacher availability status
   const toggleAvailabilityStatus = () => {
     setTeacherData({
@@ -335,30 +364,30 @@ const TeacherDashboard = () => {
       status: teacherData.status === 'Available' ? 'Unavailable' : 'Available'
     });
   };
-  
+
   // View students in a session
   const handleViewStudents = (sessionId) => {
     setSelectedSessionId(sessionId);
     setShowStudentsList(true);
   };
-  
+
   // Close students list modal
   const closeStudentsList = () => {
     setShowStudentsList(false);
     setSelectedSessionId(null);
   };
-  
+
   // Calculate stats
   const upcomingSessions = sessions.filter(s => s.status === 'Scheduled').length;
   const completedSessions = sessions.filter(s => s.status === 'Completed').length;
   const cancelledSessions = sessions.filter(s => s.status === 'Cancelled').length;
   const totalStudents = students.length;
-  
+
   // Status badge component
   const StatusBadge = ({ status }) => {
     let badgeClass = "px-2 py-1 rounded text-xs font-medium";
-    
-    switch(status.toLowerCase()) {
+
+    switch (status.toLowerCase()) {
       case 'scheduled':
         badgeClass += " bg-blue-100 text-blue-800";
         break;
@@ -389,13 +418,13 @@ const TeacherDashboard = () => {
       default:
         badgeClass += " bg-gray-100 text-gray-800";
     }
-    
+
     return <span className={badgeClass}>{status}</span>;
   };
 
   // Find selected session
   const selectedSession = selectedSessionId ? sessions.find(s => s.id === selectedSessionId) : null;
-  
+
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
@@ -406,61 +435,56 @@ const TeacherDashboard = () => {
           </div>
           <div className="mt-6 flex-1 flex flex-col">
             <nav className="flex-1 px-2 space-y-1">
-              <button 
+              <button
                 onClick={() => setActiveSection('dashboard')}
-                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${
-                  activeSection === 'dashboard' 
-                    ? 'bg-indigo-700 text-white' 
-                    : 'text-indigo-100 hover:bg-indigo-700'
-                }`}
+                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${activeSection === 'dashboard'
+                  ? 'bg-indigo-700 text-white'
+                  : 'text-indigo-100 hover:bg-indigo-700'
+                  }`}
               >
                 <Calendar className="mr-3 h-5 w-5" />
                 Dashboard
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => setActiveSection('sessions')}
-                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${
-                  activeSection === 'sessions' 
-                    ? 'bg-indigo-700 text-white' 
-                    : 'text-indigo-100 hover:bg-indigo-700'
-                }`}
+                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${activeSection === 'sessions'
+                  ? 'bg-indigo-700 text-white'
+                  : 'text-indigo-100 hover:bg-indigo-700'
+                  }`}
               >
                 <FileText className="mr-3 h-5 w-5" />
                 Sessions
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => setActiveSection('students')}
-                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${
-                  activeSection === 'students' 
-                    ? 'bg-indigo-700 text-white' 
-                    : 'text-indigo-100 hover:bg-indigo-700'
-                }`}
+                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${activeSection === 'students'
+                  ? 'bg-indigo-700 text-white'
+                  : 'text-indigo-100 hover:bg-indigo-700'
+                  }`}
               >
                 <Users className="mr-3 h-5 w-5" />
                 Students
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => setActiveSection('availability')}
-                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${
-                  activeSection === 'availability' 
-                    ? 'bg-indigo-700 text-white' 
-                    : 'text-indigo-100 hover:bg-indigo-700'
-                }`}
+                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${activeSection === 'availability'
+                  ? 'bg-indigo-700 text-white'
+                  : 'text-indigo-100 hover:bg-indigo-700'
+                  }`}
               >
                 <Clock className="mr-3 h-5 w-5" />
                 Availability
               </button>
-              
-              <button 
+
+              <button
                 onClick={() => setActiveSection('settings')}
-                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${
-                  activeSection === 'settings' 
-                    ? 'bg-indigo-700 text-white' 
-                    : 'text-indigo-100 hover:bg-indigo-700'
-                }`}
+                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${activeSection === 'settings'
+                  ? 'bg-indigo-700 text-white'
+                  : 'text-indigo-100 hover:bg-indigo-700'
+                  }`}
               >
                 <Settings className="mr-3 h-5 w-5" />
                 Settings
@@ -530,7 +554,7 @@ const TeacherDashboard = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="p-5">
                     <div className="flex items-center">
@@ -550,7 +574,7 @@ const TeacherDashboard = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="p-5">
                     <div className="flex items-center">
@@ -570,7 +594,7 @@ const TeacherDashboard = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="p-5">
                     <div className="flex items-center">
@@ -583,7 +607,7 @@ const TeacherDashboard = () => {
                         </dt>
                         <dd className="flex items-center mt-1">
                           <StatusBadge status={teacherData.status} />
-                          <button 
+                          <button
                             onClick={toggleAvailabilityStatus}
                             className="ml-2 text-xs text-indigo-600 hover:text-indigo-900"
                           >
@@ -595,7 +619,7 @@ const TeacherDashboard = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Today's Sessions */}
               <div className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
@@ -622,7 +646,7 @@ const TeacherDashboard = () => {
                       New Session
                     </button>
                   </div>
-                  
+
                   <div className="mt-5">
                     {sessions.filter(s => {
                       const today = new Date().toISOString().split('T')[0];
@@ -663,7 +687,7 @@ const TeacherDashboard = () => {
                   </div>
                 </div>
               </div>
-              
+
               {/* Upcoming Sessions */}
               <div className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
@@ -676,7 +700,7 @@ const TeacherDashboard = () => {
                       View All
                     </button>
                   </div>
-                  
+
                   <div className="mt-5">
                     {sessions.filter(s => {
                       const today = new Date().toISOString().split('T')[0];
@@ -753,7 +777,7 @@ const TeacherDashboard = () => {
                         Create Session
                       </button>
                     </div>
-                    
+
                     <div className="mt-5">
                       <div className="flex flex-col">
                         <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -796,7 +820,7 @@ const TeacherDashboard = () => {
                                         >
                                           <Users className="h-5 w-5" />
                                         </button>
-                                        
+
                                         {session.status !== 'Completed' && session.status !== 'Cancelled' && (
                                           <>
                                             <button
@@ -828,7 +852,7 @@ const TeacherDashboard = () => {
                   </div>
                 </div>
               )}
-              
+
               {/* Create/Edit Session Form */}
               {showSessionForm && (
                 <div className="bg-white overflow-hidden shadow rounded-lg">
@@ -837,7 +861,7 @@ const TeacherDashboard = () => {
                       <h3 className="text-lg font-medium leading-6 text-gray-900">
                         {isEditingSession ? 'Edit Session' : 'Create New Session'}
                       </h3>
-                      <button 
+                      <button
                         onClick={() => {
                           setShowSessionForm(false);
                           setSessionErrors({});
@@ -847,7 +871,7 @@ const TeacherDashboard = () => {
                         <X className="h-5 w-5" />
                       </button>
                     </div>
-                    
+
                     <form onSubmit={handleSessionSubmit} className="mt-5 grid grid-cols-1 gap-y-6 sm:grid-cols-2 sm:gap-x-4">
                       <div className="sm:col-span-2">
                         <label htmlFor="title" className="block text-sm font-medium text-gray-700">Session Title</label>
@@ -863,7 +887,7 @@ const TeacherDashboard = () => {
                           <p className="mt-1 text-sm text-red-600">{sessionErrors.title}</p>
                         )}
                       </div>
-                      
+
                       <div className="sm:col-span-1">
                         <label htmlFor="date" className="block text-sm font-medium text-gray-700">Date</label>
                         <input
@@ -879,7 +903,7 @@ const TeacherDashboard = () => {
                           <p className="mt-1 text-sm text-red-600">{sessionErrors.date}</p>
                         )}
                       </div>
-                      
+
                       <div className="sm:col-span-1">
                         <label htmlFor="location" className="block text-sm font-medium text-gray-700">Location</label>
                         <input
@@ -894,7 +918,7 @@ const TeacherDashboard = () => {
                           <p className="mt-1 text-sm text-red-600">{sessionErrors.location}</p>
                         )}
                       </div>
-                      
+
                       <div className="sm:col-span-1">
                         <label htmlFor="startTime" className="block text-sm font-medium text-gray-700">Start Time</label>
                         <input
@@ -909,7 +933,7 @@ const TeacherDashboard = () => {
                           <p className="mt-1 text-sm text-red-600">{sessionErrors.startTime}</p>
                         )}
                       </div>
-                      
+
                       <div className="sm:col-span-1">
                         <label htmlFor="endTime" className="block text-sm font-medium text-gray-700">End Time</label>
                         <input
@@ -924,7 +948,7 @@ const TeacherDashboard = () => {
                           <p className="mt-1 text-sm text-red-600">{sessionErrors.endTime}</p>
                         )}
                       </div>
-                      
+
                       <div className="sm:col-span-1">
                         <label htmlFor="maxStudents" className="block text-sm font-medium text-gray-700">Maximum Students</label>
                         <input
@@ -937,423 +961,452 @@ const TeacherDashboard = () => {
                           onChange={handleSessionChange}
                           className={`mt-1 block w-full border ${sessionErrors.maxStudents ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                         />
-                        {sessionErrors.maxStudents && (
-                          <p className="mt-1 text-sm text-red-600">{sessionErrors.maxStudents}</p>
-                        )}
-                      </div>
-                      
-                      <div className="sm:col-span-2">
-                        <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
-                        <textarea
-                          name="description"
-                          id="description"
-                          rows="3"
-                          value={sessionForm.description}
-                          onChange={handleSessionChange}
-                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                        ></textarea>
-                      </div>
-                      
-                      <div className="sm:col-span-2">
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setShowSessionForm(false);
-                              setSessionErrors({});
-                            }}
-                            className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                          >
-                            {isEditingSession ? 'Update Session' : 'Create Session'}
-                          </button>
-                        </div>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Students Section */}
-          {activeSection === 'students' && (
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">My Students</h3>
-                
-                <div className="mt-5">
-                  <div className="flex flex-col">
-                    <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                      <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                        <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                          <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                              <tr>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enrolled Since</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sessions</th>
-                                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Score</th>
-                              </tr>
-                            </thead>
-                            <tbody className="bg-white divide-y divide-gray-200">
-                              {students.map((student) => (
-                                <tr key={student.id}>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="flex items-center">
-                                      <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                                        {student.name.charAt(0)}
-                                      </div>
-                                      <div className="ml-4">
-                                        <div className="text-sm font-medium text-gray-900">{student.name}</div>
-                                        <div className="text-sm text-gray-500">ID: {student.id}</div>
-                                      </div>
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-gray-900">{student.email}</div>
-                                    <div className="text-sm text-gray-500">{student.phone}</div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.enrollDate}</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <div className="text-sm text-gray-900">{student.completedSessions} completed</div>
-                                    <div className="text-sm text-gray-500">{student.upcomingSessions} upcoming</div>
-                                  </td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                    {student.averageScore ? `${student.averageScore}/100` : 'N/A'}
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Availability Section */}
-          {activeSection === 'availability' && (
-            <div className="space-y-6">
-              {!showAvailabilityForm && (
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">Availability Status</h3>
-                      <div className="flex items-center">
-                        <StatusBadge status={teacherData.status} />
-                        <button 
-                          onClick={toggleAvailabilityStatus}
-                          className="ml-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
-                        >
-                          Toggle Status
-                        </button>
-                      </div>
-                    </div>
-                    
-                    <div className="mt-5">
-                      <h4 className="text-base font-medium text-gray-900">Weekly Schedule</h4>
-                      <div className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-7">
-                        {Object.entries(availabilityForm)
-                          .filter(([key]) => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(key))
-                          .map(([day, data]) => (
-                            <div key={day} className="bg-gray-50 overflow-hidden rounded-lg border border-gray-200 p-4">
-                              <h5 className="font-medium text-gray-900 capitalize">{day}</h5>
-                              <p className="mt-1 text-sm text-gray-500">
-                                {data.isAvailable ? (
-                                  <>
-                                    <span className="text-green-600 font-medium">Available</span>
-                                    <br />
-                                    {data.startTime} - {data.endTime}
-                                  </>
-                                ) : (
-                                  <span className="text-gray-600">Unavailable</span>
-                                )}
-                              </p>
-                            </div>
-                          ))}
-                      </div>
-                      
-                      <div className="mt-6">
-                        {availabilityForm.isOnVacation && (
-                          <div className="bg-yellow-50 p-4 rounded-md">
-                            <div className="flex">
-                              <div className="flex-shrink-0">
-                                <Clock className="h-5 w-5 text-yellow-400" />
-                              </div>
-                              <div className="ml-3">
-                                <h3 className="text-sm font-medium text-yellow-800">Vacation Mode Active</h3>
-                                <div className="mt-2 text-sm text-yellow-700">
-                                  <p>You are on vacation from {availabilityForm.vacationStart} to {availabilityForm.vacationEnd}.</p>
-                                  {availabilityForm.vacationNote && (
-                                    <p className="mt-1">Note: {availabilityForm.vacationNote}</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                        
-                        <button
-                          onClick={() => setShowAvailabilityForm(true)}
-                          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
-                        >
-                          <Edit className="mr-2 h-4 w-4" />
-                          Edit Availability
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-              
-              {/* Edit Availability Form */}
-              {showAvailabilityForm && (
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">Edit Availability</h3>
-                      <button 
-                        onClick={() => setShowAvailabilityForm(false)}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                    
-                    <form onSubmit={handleAvailabilitySubmit} className="mt-5">
-                      <div className="space-y-6">
-                        <div>
-                          <h4 className="text-base font-medium text-gray-900">Weekly Schedule</h4>
-                          <p className="mt-1 text-sm text-gray-500">Set your regular weekly availability.</p>
-                          
-                          <div className="mt-3 space-y-4">
-                            {Object.entries(availabilityForm)
-                              .filter(([key]) => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(key))
-                              .map(([day, data]) => (
-                                <div key={day} className="p-4 bg-gray-50 rounded-md">
-                                  <div className="flex items-center justify-between">
-                                    <h5 className="font-medium text-gray-900 capitalize">{day}</h5>
-                                    <div className="flex items-center">
-                                      <input
-                                        type="checkbox"
-                                        id={`${day}-available`}
-                                        checked={data.isAvailable}
-                                        onChange={(e) => handleAvailabilityChange(day, 'isAvailable', e.target.checked)}
-                                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                                      />
-                                      <label htmlFor={`${day}-available`} className="ml-2 block text-sm text-gray-900">
-                                        Available
-                                      </label>
-                                    </div>
-                                  </div>
-                                  
-                                  {data.isAvailable && (
-                                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                      <div>
-                                        <label htmlFor={`${day}-start`} className="block text-sm font-medium text-gray-700">Start Time</label>
-                                        <input
-                                          type="time"
-                                          id={`${day}-start`}
-                                          value={data.startTime}
-                                          onChange={(e) => handleAvailabilityChange(day, 'startTime', e.target.value)}
-                                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                        />
-                                      </div>
-                                      
-                                      <div>
-                                        <label htmlFor={`${day}-end`} className="block text-sm font-medium text-gray-700">End Time</label>
-                                        <input
-                                          type="time"
-                                          id={`${day}-end`}
-                                          value={data.endTime}
-                                          onChange={(e) => handleAvailabilityChange(day, 'endTime', e.target.value)}
-                                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                        />
-                                      </div>
-                                    </div>
-                                  )}
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                        
-                        <div className="pt-5 border-t border-gray-200">
-                          <h4 className="text-base font-medium text-gray-900">Vacation Settings</h4>
-                          <p className="mt-1 text-sm text-gray-500">Set vacation or time off.</p>
-                          
-                          <div className="mt-3">
-                            <div className="flex items-center">
-                              <input
-                                type="checkbox"
-                                id="isOnVacation"
-                                name="isOnVacation"
-                                checked={availabilityForm.isOnVacation}
-                                onChange={handleVacationChange}
-                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
-                              />
-                              <label htmlFor="isOnVacation" className="ml-2 block text-sm text-gray-900">
-                                I'm going on vacation
-                              </label>
-                            </div>
-                            
-                            {availabilityForm.isOnVacation && (
-                              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div>
-                                  <label htmlFor="vacationStart" className="block text-sm font-medium text-gray-700">Start Date</label>
-                                  <input
-                                    type="date"
-                                    id="vacationStart"
-                                    name="vacationStart"
-                                    value={availabilityForm.vacationStart}
-                                    onChange={handleVacationChange}
-                                    min={new Date().toISOString().split('T')[0]}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                  />
-                                </div>
-                                
-                                <div>
-                                  <label htmlFor="vacationEnd" className="block text-sm font-medium text-gray-700">End Date</label>
-                                  <input
-                                    type="date"
-                                    id="vacationEnd"
-                                    name="vacationEnd"
-                                    value={availabilityForm.vacationEnd}
-                                    onChange={handleVacationChange}
-                                    min={availabilityForm.vacationStart || new Date().toISOString().split('T')[0]}
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                  />
-                                </div>
-                                
-                                <div className="sm:col-span-2">
-                                  <label htmlFor="vacationNote" className="block text-sm font-medium text-gray-700">Note (Optional)</label>
-                                  <input
-                                    type="text"
-                                    id="vacationNote"
-                                    name="vacationNote"
-                                    value={availabilityForm.vacationNote}
-                                    onChange={handleVacationChange}
-                                    placeholder="e.g., Out of town for conference"
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                  />
-                                </div>
-                              </div>
+                        <div className="flex-1">
+                          <div className="text-xs text-blue-700 bg-blue-50 border border-blue-200 rounded px-2 py-1 text-center min-w-[120px]">
+                            {sessionForm.startTime ? (
+                              predictionLoading ? (
+                                "Predicting..."
+                              ) : predictedAttendance !== null ? (
+                                <>
+                                  <span className="font-medium">Predicted Attendance:</span>
+                                  <div className="text-lg text-blue-600">{predictedAttendance}</div>
+                                </>
+                              ) : (
+                                "No prediction available"
+                              )
+                            ) : (
+                              <span className="text-gray-500">Select time for prediction</span>
                             )}
                           </div>
                         </div>
-                        
-                        <div className="flex justify-end space-x-3">
-                          <button
-                            type="button"
-                            onClick={() => setShowAvailabilityForm(false)}
-                            className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            type="submit"
-                            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                          >
-                            Save Settings
-                          </button>
-                        </div>
                       </div>
-                    </form>
+                      {sessionErrors.maxStudents && (
+                        <p className="mt-1 text-sm text-red-600">{sessionErrors.maxStudents}</p>
+                      )}
+                  
+
+
+                  <div className="sm:col-span-2">
+                    <label htmlFor="description" className="block text-sm font-medium text-gray-700">Description</label>
+                    <textarea
+                      name="description"
+                      id="description"
+                      rows="3"
+                      value={sessionForm.description}
+                      onChange={handleSessionChange}
+                      className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                    ></textarea>
+                  </div>
+
+                  <div className="sm:col-span-2">
+                    <div className="flex justify-end space-x-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSessionForm(false);
+                          setSessionErrors({});
+                        }}
+                        className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="submit"
+                        className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                      >
+                        {isEditingSession ? 'Update Session' : 'Create Session'}
+                      </button>
+                    </div>
+                  </div>
+                </form>
                   </div>
                 </div>
               )}
-            </div>
-          )}
-          
-          {/* Settings Section */}
-          {activeSection === 'settings' && (
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">Account Settings</h3>
-                <div className="mt-5">
-                  <p className="text-gray-500">Account settings panel would go here.</p>
+    </div>
+  )
+}
+
+{/* Students Section */ }
+{
+  activeSection === 'students' && (
+    <div className="bg-white overflow-hidden shadow rounded-lg">
+      <div className="px-4 py-5 sm:p-6">
+        <h3 className="text-lg font-medium leading-6 text-gray-900">My Students</h3>
+
+        <div className="mt-5">
+          <div className="flex flex-col">
+            <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+              <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+                <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Enrolled Since</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sessions</th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg. Score</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {students.map((student) => (
+                        <tr key={student.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                                {student.name.charAt(0)}
+                              </div>
+                              <div className="ml-4">
+                                <div className="text-sm font-medium text-gray-900">{student.name}</div>
+                                <div className="text-sm text-gray-500">ID: {student.id}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{student.email}</div>
+                            <div className="text-sm text-gray-500">{student.phone}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.enrollDate}</td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">{student.completedSessions} completed</div>
+                            <div className="text-sm text-gray-500">{student.upcomingSessions} upcoming</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {student.averageScore ? `${student.averageScore}/100` : 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>
-          )}
-        </main>
+          </div>
+        </div>
       </div>
-      
-      {/* Student List Modal */}
-      {showStudentsList && selectedSession && (
-        <div className="fixed inset-0 z-10 overflow-y-auto">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 transition-opacity" aria-hidden="true">
-              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+    </div>
+  )
+}
+
+{/* Availability Section */ }
+{
+  activeSection === 'availability' && (
+    <div className="space-y-6">
+      {!showAvailabilityForm && (
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium leading-6 text-gray-900">Availability Status</h3>
+              <div className="flex items-center">
+                <StatusBadge status={teacherData.status} />
+                <button
+                  onClick={toggleAvailabilityStatus}
+                  className="ml-2 inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none"
+                >
+                  Toggle Status
+                </button>
+              </div>
             </div>
 
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      Students in {selectedSession.title}
-                    </h3>
-                    <div className="mt-4">
-                      {selectedSession.enrolledStudents.length > 0 ? (
-                        <div className="flow-root">
-                          <ul className="-my-5 divide-y divide-gray-200">
-                            {selectedSession.enrolledStudents.map((student) => (
-                              <li key={student.id} className="py-4">
-                                <div className="flex items-center space-x-4">
-                                  <div className="flex-shrink-0">
-                                    <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
-                                      {student.name.charAt(0)}
-                                    </div>
-                                  </div>
-                                  <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-medium text-gray-900 truncate">
-                                      {student.name}
-                                    </p>
-                                    <p className="text-sm text-gray-500 truncate">
-                                      {student.email}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <StatusBadge status={student.attendance} />
-                                  </div>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
+            <div className="mt-5">
+              <h4 className="text-base font-medium text-gray-900">Weekly Schedule</h4>
+              <div className="mt-3 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-7">
+                {Object.entries(availabilityForm)
+                  .filter(([key]) => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(key))
+                  .map(([day, data]) => (
+                    <div key={day} className="bg-gray-50 overflow-hidden rounded-lg border border-gray-200 p-4">
+                      <h5 className="font-medium text-gray-900 capitalize">{day}</h5>
+                      <p className="mt-1 text-sm text-gray-500">
+                        {data.isAvailable ? (
+                          <>
+                            <span className="text-green-600 font-medium">Available</span>
+                            <br />
+                            {data.startTime} - {data.endTime}
+                          </>
+                        ) : (
+                          <span className="text-gray-600">Unavailable</span>
+                        )}
+                      </p>
+                    </div>
+                  ))}
+              </div>
+
+              <div className="mt-6">
+                {availabilityForm.isOnVacation && (
+                  <div className="bg-yellow-50 p-4 rounded-md">
+                    <div className="flex">
+                      <div className="flex-shrink-0">
+                        <Clock className="h-5 w-5 text-yellow-400" />
+                      </div>
+                      <div className="ml-3">
+                        <h3 className="text-sm font-medium text-yellow-800">Vacation Mode Active</h3>
+                        <div className="mt-2 text-sm text-yellow-700">
+                          <p>You are on vacation from {availabilityForm.vacationStart} to {availabilityForm.vacationEnd}.</p>
+                          {availabilityForm.vacationNote && (
+                            <p className="mt-1">Note: {availabilityForm.vacationNote}</p>
+                          )}
                         </div>
-                      ) : (
-                        <p className="text-sm text-gray-500">No students enrolled in this session yet.</p>
-                      )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                )}
+
                 <button
-                  type="button"
-                  onClick={closeStudentsList}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => setShowAvailabilityForm(true)}
+                  className="mt-4 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
                 >
-                  Close
+                  <Edit className="mr-2 h-4 w-4" />
+                  Edit Availability
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Edit Availability Form */}
+      {showAvailabilityForm && (
+        <div className="bg-white overflow-hidden shadow rounded-lg">
+          <div className="px-4 py-5 sm:p-6">
+            <div className="flex justify-between items-center">
+              <h3 className="text-lg font-medium leading-6 text-gray-900">Edit Availability</h3>
+              <button
+                onClick={() => setShowAvailabilityForm(false)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAvailabilitySubmit} className="mt-5">
+              <div className="space-y-6">
+                <div>
+                  <h4 className="text-base font-medium text-gray-900">Weekly Schedule</h4>
+                  <p className="mt-1 text-sm text-gray-500">Set your regular weekly availability.</p>
+
+                  <div className="mt-3 space-y-4">
+                    {Object.entries(availabilityForm)
+                      .filter(([key]) => ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].includes(key))
+                      .map(([day, data]) => (
+                        <div key={day} className="p-4 bg-gray-50 rounded-md">
+                          <div className="flex items-center justify-between">
+                            <h5 className="font-medium text-gray-900 capitalize">{day}</h5>
+                            <div className="flex items-center">
+                              <input
+                                type="checkbox"
+                                id={`${day}-available`}
+                                checked={data.isAvailable}
+                                onChange={(e) => handleAvailabilityChange(day, 'isAvailable', e.target.checked)}
+                                className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                              />
+                              <label htmlFor={`${day}-available`} className="ml-2 block text-sm text-gray-900">
+                                Available
+                              </label>
+                            </div>
+                          </div>
+
+                          {data.isAvailable && (
+                            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                              <div>
+                                <label htmlFor={`${day}-start`} className="block text-sm font-medium text-gray-700">Start Time</label>
+                                <input
+                                  type="time"
+                                  id={`${day}-start`}
+                                  value={data.startTime}
+                                  onChange={(e) => handleAvailabilityChange(day, 'startTime', e.target.value)}
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                />
+                              </div>
+
+                              <div>
+                                <label htmlFor={`${day}-end`} className="block text-sm font-medium text-gray-700">End Time</label>
+                                <input
+                                  type="time"
+                                  id={`${day}-end`}
+                                  value={data.endTime}
+                                  onChange={(e) => handleAvailabilityChange(day, 'endTime', e.target.value)}
+                                  className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                  </div>
+                </div>
+
+                <div className="pt-5 border-t border-gray-200">
+                  <h4 className="text-base font-medium text-gray-900">Vacation Settings</h4>
+                  <p className="mt-1 text-sm text-gray-500">Set vacation or time off.</p>
+
+                  <div className="mt-3">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="isOnVacation"
+                        name="isOnVacation"
+                        checked={availabilityForm.isOnVacation}
+                        onChange={handleVacationChange}
+                        className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="isOnVacation" className="ml-2 block text-sm text-gray-900">
+                        I'm going on vacation
+                      </label>
+                    </div>
+
+                    {availabilityForm.isOnVacation && (
+                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label htmlFor="vacationStart" className="block text-sm font-medium text-gray-700">Start Date</label>
+                          <input
+                            type="date"
+                            id="vacationStart"
+                            name="vacationStart"
+                            value={availabilityForm.vacationStart}
+                            onChange={handleVacationChange}
+                            min={new Date().toISOString().split('T')[0]}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          />
+                        </div>
+
+                        <div>
+                          <label htmlFor="vacationEnd" className="block text-sm font-medium text-gray-700">End Date</label>
+                          <input
+                            type="date"
+                            id="vacationEnd"
+                            name="vacationEnd"
+                            value={availabilityForm.vacationEnd}
+                            onChange={handleVacationChange}
+                            min={availabilityForm.vacationStart || new Date().toISOString().split('T')[0]}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          />
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label htmlFor="vacationNote" className="block text-sm font-medium text-gray-700">Note (Optional)</label>
+                          <input
+                            type="text"
+                            id="vacationNote"
+                            name="vacationNote"
+                            value={availabilityForm.vacationNote}
+                            onChange={handleVacationChange}
+                            placeholder="e.g., Out of town for conference"
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAvailabilityForm(false)}
+                    className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  >
+                    Save Settings
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
+  )
+}
+
+{/* Settings Section */ }
+{
+  activeSection === 'settings' && (
+    <div className="bg-white overflow-hidden shadow rounded-lg">
+      <div className="px-4 py-5 sm:p-6">
+        <h3 className="text-lg font-medium leading-6 text-gray-900">Account Settings</h3>
+        <div className="mt-5">
+          <p className="text-gray-500">Account settings panel would go here.</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+        </main >
+      </div >
+
+  {/* Student List Modal */ }
+{
+  showStudentsList && selectedSession && (
+    <div className="fixed inset-0 z-10 overflow-y-auto">
+      <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        <div className="fixed inset-0 transition-opacity" aria-hidden="true">
+          <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+        </div>
+
+        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+          <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <div className="sm:flex sm:items-start">
+              <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                <h3 className="text-lg leading-6 font-medium text-gray-900">
+                  Students in {selectedSession.title}
+                </h3>
+                <div className="mt-4">
+                  {selectedSession.enrolledStudents.length > 0 ? (
+                    <div className="flow-root">
+                      <ul className="-my-5 divide-y divide-gray-200">
+                        {selectedSession.enrolledStudents.map((student) => (
+                          <li key={student.id} className="py-4">
+                            <div className="flex items-center space-x-4">
+                              <div className="flex-shrink-0">
+                                <div className="h-8 w-8 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600 font-bold">
+                                  {student.name.charAt(0)}
+                                </div>
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm font-medium text-gray-900 truncate">
+                                  {student.name}
+                                </p>
+                                <p className="text-sm text-gray-500 truncate">
+                                  {student.email}
+                                </p>
+                              </div>
+                              <div>
+                                <StatusBadge status={student.attendance} />
+                              </div>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No students enrolled in this session yet.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+            <button
+              type="button"
+              onClick={closeStudentsList}
+              className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+    </div >
   );
 };
 
