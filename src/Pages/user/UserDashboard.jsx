@@ -1,39 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { User, Car, Calendar, BarChart3, FileText, MessageSquare, Settings, LogOut, Lock, Edit, Trash2, Download, Send, ChevronRight, Info, X } from 'lucide-react';
+import { User, Calendar, BarChart3, MessageSquare, LogOut, Edit, Trash2, Download, Send, Info, X, Check, AlertTriangle } from 'lucide-react';
+import { useTrainingSessions } from '../../hooks/useTrainingSessions';
+import { useSessionStudents } from '../../hooks/useSessionStudents';
+import { useAuth } from '../../hooks/AuthContext';
+import axiosInstance from '../../lib/axiosInstance';
+import ChatBot from '../../Components/ChatBot';
+
+
 
 const UserDashboard = () => {
-  // Active section state
+  // Authentication and user data
+  const { logout, updateUser } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [showEditProfile, setShowEditProfile] = useState(false);
-  const [showReportOptions, setShowReportOptions] = useState(false);
   
-  // Current user state
-  const [currentUser, setCurrentUser] = useState({
-    userID: 'U001',
-    firstName: 'John',
-    lastName: 'Doe',
-    username: 'johndoe',
-    email: 'john.doe@example.com',
-    phoneNumber: '555-123-4567',
-    address: '123 Main Street, Anytown, USA',
-    gender: 'Male',
-    isStudent: true,
-    enrollDate: '2023-08-15',
-    package: 'Premium Driver Training'
-  });
+  // UI state management
+  const [showEditProfile, setShowEditProfile] = useState(false);
+  const [showEnrollForm, setShowEnrollForm] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState(null);
+  const [user , setUser] = useState(null);
+  const token = localStorage.getItem('accessToken');
+  console.log(token);
+
+  useEffect(() => {
+
+      const getUserInfo = async () => {
+        try {
+          const response = await axiosInstance.get(`/auth/me`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          });
+          setUser(response.data.user);
+          console.log('User info:', response.data.user);
+        } catch (error) {
+          console.error('Error fetching user info:', error);
+        }
+      }
+    getUserInfo();
+  } , []);
+
+  // Training sessions data from hooks
+  const { 
+    sessions: availableSessions, 
+    loading: sessionsLoading,
+    error: sessionsError
+  } = useTrainingSessions();
+  
+  // User's enrollments
+  const [userEnrollments, setUserEnrollments] = useState([]);
+  const [enrollmentsLoading, setEnrollmentsLoading] = useState(false);
   
   // Form states
-  const [profileForm, setProfileForm] = useState({...currentUser});
+  const [profileForm, setProfileForm] = useState({ ...user });
   const [profileErrors, setProfileErrors] = useState({});
-  
-  const [passwordForm, setPasswordForm] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
-  });
-  const [passwordErrors, setPasswordErrors] = useState({});
   
   // Chatbot state
   const [chatMessages, setChatMessages] = useState([
@@ -42,59 +61,25 @@ const UserDashboard = () => {
   const [userMessage, setUserMessage] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   
-  // Enrolled sessions data
-  const [sessions, setSessions] = useState([
-    {
-      id: 'S001',
-      title: 'Basic Road Navigation',
-      date: '2024-02-15',
-      time: '10:00 AM - 12:00 PM',
-      instructor: 'Sarah Miller',
-      status: 'Completed',
-      marks: 92,
-      feedback: 'Excellent navigation skills. Good understanding of road signs.'
-    },
-    {
-      id: 'S002',
-      title: 'Parallel Parking',
-      date: '2024-02-22',
-      time: '2:00 PM - 4:00 PM',
-      instructor: 'James Wilson',
-      status: 'Completed',
-      marks: 85,
-      feedback: 'Good control of the vehicle. Needs more practice with tight spots.'
-    },
-    {
-      id: 'S003',
-      title: 'Highway Driving',
-      date: '2024-03-01',
-      time: '9:00 AM - 11:00 AM',
-      instructor: 'Alex Johnson',
-      status: 'Completed',
-      marks: 90,
-      feedback: 'Excellent speed control and lane changing. Very confident.'
-    },
-    {
-      id: 'S004',
-      title: 'Night Driving',
-      date: '2024-03-10',
-      time: '6:00 PM - 8:00 PM',
-      instructor: 'Sarah Miller',
-      status: 'Scheduled',
-      marks: null,
-      feedback: null
-    },
-    {
-      id: 'S005',
-      title: 'Defensive Driving',
-      date: '2024-03-18',
-      time: '1:00 PM - 3:00 PM',
-      instructor: 'James Wilson',
-      status: 'Scheduled',
-      marks: null,
-      feedback: null
-    }
-  ]);
+  // Fetch user enrollments
+  useEffect(() => {
+    const fetchUserEnrollments = async () => {
+      if (!user?.userID) return;
+      
+      setEnrollmentsLoading(true);
+      try {
+        // Using the physicalTrainingService directly would be better in a real app
+        const response = await axiosInstance.get(`/enroll-pts/user/${user.userID}`);
+        setUserEnrollments(response.data.enrollments);
+      } catch (error) {
+        console.error('Error fetching enrollments:', error);
+      } finally {
+        setEnrollmentsLoading(false);
+      }
+    };
+    
+    fetchUserEnrollments();
+  }, [user?.userID]);
   
   // Profile validation
   const validateProfileForm = () => {
@@ -102,7 +87,6 @@ const UserDashboard = () => {
     
     if (!profileForm.firstName) errors.firstName = 'First name is required';
     if (!profileForm.lastName) errors.lastName = 'Last name is required';
-    if (!profileForm.username) errors.username = 'Username is required';
     if (!profileForm.email) {
       errors.email = 'Email is required';
     } else if (!/\S+@\S+\.\S+/.test(profileForm.email)) {
@@ -110,148 +94,112 @@ const UserDashboard = () => {
     }
     if (!profileForm.phoneNumber) errors.phoneNumber = 'Phone number is required';
     if (!profileForm.address) errors.address = 'Address is required';
-    if (!profileForm.gender) errors.gender = 'Gender is required';
     
     setProfileErrors(errors);
     return Object.keys(errors).length === 0;
   };
   
-  // Password validation
-  const validatePasswordForm = () => {
-    const errors = {};
-    
-    if (!passwordForm.currentPassword) {
-      errors.currentPassword = 'Current password is required';
-    }
-    
-    if (!passwordForm.newPassword) {
-      errors.newPassword = 'New password is required';
-    } else if (passwordForm.newPassword.length < 6) {
-      errors.newPassword = 'Password must be at least 6 characters';
-    }
-    
-    if (!passwordForm.confirmPassword) {
-      errors.confirmPassword = 'Please confirm your password';
-    } else if (passwordForm.confirmPassword !== passwordForm.newPassword) {
-      errors.confirmPassword = 'Passwords do not match';
-    }
-    
-    setPasswordErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-  
   // Handle profile update
-  const handleProfileUpdate = (e) => {
+  const handleProfileUpdate = async (e) => {
     e.preventDefault();
     
     if (validateProfileForm()) {
-      setCurrentUser({...profileForm});
-      setShowEditProfile(false);
-      alert('Profile updated successfully!');
+      try {
+        // Here you would call your API to update the profile
+        // For example: await userService.updateProfile(profileForm);
+        
+        // For now, we'll update the local user state
+        updateUser(profileForm);
+        setShowEditProfile(false);
+        
+        // Show success message
+        alert('Profile updated successfully!');
+      } catch (error) {
+        console.error('Error updating profile:', error);
+        alert('Failed to update profile. Please try again.');
+      }
     }
   };
   
-  // Handle password change
-  const handlePasswordChange = (e) => {
-    e.preventDefault();
-    
-    if (validatePasswordForm()) {
-      // Here you would normally send the password change to your API
-      setShowPasswordForm(false);
-      setPasswordForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
-      });
-      alert('Password changed successfully!');
-    }
-  };
-  
-  // Handle account deletion
-  const handleDeleteAccount = () => {
-    // Here you would normally send a delete request to your API
-    alert('Account deleted successfully!');
-    // Redirect to login page or similar
-  };
-  
-  // Handle form input changes
+  // Form change handler
   const handleProfileChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setProfileForm({
       ...profileForm,
-      [name]: type === 'checkbox' ? checked : value
-    });
-  };
-  
-  const handlePasswordFormChange = (e) => {
-    const { name, value } = e.target;
-    setPasswordForm({
-      ...passwordForm,
       [name]: value
     });
   };
   
-  // Send message to chatbot
-  const sendMessage = async () => {
-    if (!userMessage.trim()) return;
+  // Enroll in a session
+  const handleEnrollSession = async () => {
+    if (!selectedSessionId) return;
     
-    // Add user message to chat
-    const newMessage = { role: 'user', content: userMessage };
-    setChatMessages([...chatMessages, newMessage]);
-    setUserMessage('');
-    setIsTyping(true);
-    
-    // Simulate API call to OpenAI
-    setTimeout(() => {
-      // This is where you would normally call the OpenAI API
-      // For demonstration, we'll simulate a response
-      const botResponse = simulateBotResponse(userMessage);
-      setChatMessages(prev => [...prev, { role: 'system', content: botResponse }]);
-      setIsTyping(false);
-    }, 1000);
-  };
-  
-  // Simulate bot response (in a real app, this would be an API call to OpenAI)
-  const simulateBotResponse = (message) => {
-    const lowerMessage = message.toLowerCase();
-    
-    if (lowerMessage.includes('lesson') || lowerMessage.includes('class') || lowerMessage.includes('session')) {
-      return "Your next driving lesson is scheduled for March 18th at 1:00 PM with instructor James Wilson. The topic will be Defensive Driving. Would you like me to provide more details?";
-    } else if (lowerMessage.includes('progress') || lowerMessage.includes('how am i doing')) {
-      return "You're making excellent progress! Your average score across completed sessions is 89/100. Your instructors have noted your strengths in navigation and highway driving.";
-    } else if (lowerMessage.includes('change') && lowerMessage.includes('password')) {
-      return "To change your password, go to the Profile section and click on 'Change Password'. You'll need to enter your current password and then your new password twice.";
-    } else if (lowerMessage.includes('report')) {
-      return "You can generate performance reports from the Reports section. You can choose different time periods and types of reports to get insights into your driving progress.";
-    } else {
-      return "Thank you for your message. How else can I assist you with your driving lessons or account management?";
+    try {
+      // Call the enrollment API
+      await axiosInstance.post('/enroll-pts', {
+        userId: user.userID,
+        sessionId: selectedSessionId
+      });
+      
+      // Refetch enrollments to update the list
+      const response = await axiosInstance.get(`/enroll-pts/user/${user.userID}`);
+      setUserEnrollments(response.data.enrollments);
+      
+      // Close the enrollment form
+      setShowEnrollForm(false);
+      setSelectedSessionId(null);
+      
+      // Show success message
+      alert('Successfully enrolled in the session!');
+    } catch (error) {
+      console.error('Error enrolling in session:', error);
+      alert('Failed to enroll in session. Please try again.');
     }
   };
   
-  // Generate PDF report (simulated)
-  const generateReport = (type) => {
-    alert(`Generating ${type} report... In a real application, this would create a PDF.`);
-    setShowReportOptions(false);
+  // Unenroll from a session
+  const handleUnenrollSession = async (enrollmentId) => {
+    if (!enrollmentId) return;
+    
+    if (window.confirm('Are you sure you want to cancel this enrollment?')) {
+      try {
+        // Call the unenroll API
+        await axiosInstance.delete(`/enroll-pts/${enrollmentId}`);
+        
+        // Update local state
+        setUserEnrollments(userEnrollments.filter(e => e._id !== enrollmentId));
+        
+        // Show success message
+        alert('Successfully cancelled enrollment.');
+      } catch (error) {
+        console.error('Error cancelling enrollment:', error);
+        alert('Failed to cancel enrollment. Please try again.');
+      }
+    }
   };
   
+  
   // Calculate statistics
-  const completedSessions = sessions.filter(s => s.status === 'Completed').length;
-  const upcomingSessions = sessions.filter(s => s.status === 'Scheduled').length;
-  const averageScore = sessions.filter(s => s.marks !== null).reduce((acc, curr) => acc + curr.marks, 0) / completedSessions || 0;
+  const completedSessions = userEnrollments.filter(e => e.sessionDetails?.status === 'completed').length;
+  const upcomingSessions = userEnrollments.filter(e => e.sessionDetails?.status === 'pending').length;
   
   // Status badge component
   const StatusBadge = ({ status }) => {
     let badgeClass = "px-2 py-1 rounded text-xs font-medium";
     
-    switch(status.toLowerCase()) {
+    switch(status?.toLowerCase()) {
       case 'completed':
         badgeClass += " bg-green-100 text-green-800";
         break;
+      case 'pending':
       case 'scheduled':
         badgeClass += " bg-blue-100 text-blue-800";
         break;
       case 'cancelled':
         badgeClass += " bg-red-100 text-red-800";
+        break;
+      case 'confirmed':
+        badgeClass += " bg-purple-100 text-purple-800";
         break;
       default:
         badgeClass += " bg-gray-100 text-gray-800";
@@ -259,6 +207,13 @@ const UserDashboard = () => {
     
     return <span className={badgeClass}>{status}</span>;
   };
+
+  // Loading state
+  if (!user) {
+    return <div className="flex justify-center items-center h-screen">
+      <p>Loading user data...</p>
+    </div>;
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -307,18 +262,6 @@ const UserDashboard = () => {
               </button>
               
               <button 
-                onClick={() => setActiveSection('reports')}
-                className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${
-                  activeSection === 'reports' 
-                    ? 'bg-indigo-700 text-white' 
-                    : 'text-indigo-100 hover:bg-indigo-700'
-                }`}
-              >
-                <FileText className="mr-3 h-5 w-5" />
-                Reports
-              </button>
-              
-              <button 
                 onClick={() => setActiveSection('assistant')}
                 className={`group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full ${
                   activeSection === 'assistant' 
@@ -332,7 +275,10 @@ const UserDashboard = () => {
             </nav>
           </div>
           <div className="px-2">
-            <button className="group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full text-indigo-100 hover:bg-indigo-700">
+            <button 
+              onClick={logout}
+              className="group flex items-center px-2 py-3 text-sm font-medium rounded-md w-full text-indigo-100 hover:bg-indigo-700"
+            >
               <LogOut className="mr-3 h-5 w-5" />
               Logout
             </button>
@@ -349,8 +295,7 @@ const UserDashboard = () => {
               <h1 className="text-2xl font-semibold text-gray-900">
                 {activeSection === 'dashboard' && 'Student Dashboard'}
                 {activeSection === 'profile' && 'My Profile'}
-                {activeSection === 'sessions' && 'My Sessions & Progress'}
-                {activeSection === 'reports' && 'Performance Reports'}
+                {activeSection === 'sessions' && 'My Training Sessions'}
                 {activeSection === 'assistant' && 'AI Assistant'}
               </h1>
             </div>
@@ -358,9 +303,9 @@ const UserDashboard = () => {
               <div className="ml-3 relative">
                 <div className="flex items-center">
                   <div className="h-8 w-8 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold">
-                    {currentUser.firstName.charAt(0)}{currentUser.lastName.charAt(0)}
+                    {user.firstName?.charAt(0)}{user.lastName?.charAt(0)}
                   </div>
-                  <span className="ml-2 text-sm font-medium text-gray-700">{currentUser.firstName} {currentUser.lastName}</span>
+                  <span className="ml-2 text-sm font-medium text-gray-700">{user.firstName} {user.lastName}</span>
                 </div>
               </div>
             </div>
@@ -375,15 +320,15 @@ const UserDashboard = () => {
               {/* Welcome Banner */}
               <div className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-4 py-5 sm:p-6">
-                  <h3 className="text-xl font-medium leading-6 text-white">Welcome back, {currentUser.firstName}!</h3>
+                  <h3 className="text-xl font-medium leading-6 text-white">Welcome back, {user.firstName}!</h3>
                   <p className="mt-1 text-sm text-blue-100">
-                    Your driving journey continues. You've completed {completedSessions} sessions with an average score of {averageScore.toFixed(1)}.
+                    Your driving journey continues. You're enrolled in {userEnrollments.length} sessions.
                   </p>
                 </div>
               </div>
               
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="p-5">
                     <div className="flex items-center">
@@ -392,15 +337,32 @@ const UserDashboard = () => {
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dt className="text-sm font-medium text-gray-500 truncate">
-                          Sessions Completed
+                          Total Sessions
+                        </dt>
+                        <dd className="flex items-baseline">
+                          <div className="text-2xl font-semibold text-gray-900">
+                            {userEnrollments.length}
+                          </div>
+                        </dd>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="p-5">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0">
+                        <Check className="h-8 w-8 text-emerald-600" />
+                      </div>
+                      <div className="ml-5 w-0 flex-1">
+                        <dt className="text-sm font-medium text-gray-500 truncate">
+                          Completed Sessions
                         </dt>
                         <dd className="flex items-baseline">
                           <div className="text-2xl font-semibold text-gray-900">
                             {completedSessions}
                           </div>
-                          <div className="ml-2 flex items-baseline text-xs font-semibold text-green-500">
-                            {upcomingSessions > 0 ? `${upcomingSessions} upcoming` : 'All done!'}
-                          </div>
                         </dd>
                       </div>
                     </div>
@@ -411,58 +373,15 @@ const UserDashboard = () => {
                   <div className="p-5">
                     <div className="flex items-center">
                       <div className="flex-shrink-0">
-                        <BarChart3 className="h-8 w-8 text-emerald-600" />
+                        <Calendar className="h-8 w-8 text-amber-600" />
                       </div>
                       <div className="ml-5 w-0 flex-1">
                         <dt className="text-sm font-medium text-gray-500 truncate">
-                          Average Score
+                          Upcoming Sessions
                         </dt>
                         <dd className="flex items-baseline">
                           <div className="text-2xl font-semibold text-gray-900">
-                            {averageScore.toFixed(1)}
-                          </div>
-                          <div className="ml-2 flex items-baseline text-xs font-semibold text-gray-500">
-                            out of 100
-                          </div>
-                        </dd>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <Car className="h-8 w-8 text-amber-600" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Next Session
-                        </dt>
-                        <dd className="flex items-baseline">
-                          <div className="text-lg font-semibold text-gray-900">
-                            {upcomingSessions > 0 ? sessions.find(s => s.status === 'Scheduled').date : 'None scheduled'}
-                          </div>
-                        </dd>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-5">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <User className="h-8 w-8 text-purple-600" />
-                      </div>
-                      <div className="ml-5 w-0 flex-1">
-                        <dt className="text-sm font-medium text-gray-500 truncate">
-                          Package
-                        </dt>
-                        <dd className="flex items-baseline">
-                          <div className="text-lg font-semibold text-gray-900">
-                            {currentUser.package}
+                            {upcomingSessions}
                           </div>
                         </dd>
                       </div>
@@ -471,7 +390,7 @@ const UserDashboard = () => {
                 </div>
               </div>
               
-              {/* Upcoming Sessions */}
+              {/* Upcoming Sessions Quick View */}
               <div className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
                   <div className="flex justify-between items-center">
@@ -485,20 +404,25 @@ const UserDashboard = () => {
                   </div>
                   
                   <div className="mt-5">
-                    {sessions.filter(s => s.status === 'Scheduled').length > 0 ? (
+                    {enrollmentsLoading ? (
+                      <p className="text-gray-500">Loading sessions...</p>
+                    ) : userEnrollments.filter(e => e.sessionDetails?.status === 'pending').length > 0 ? (
                       <ul className="divide-y divide-gray-200">
-                        {sessions
-                          .filter(s => s.status === 'Scheduled')
+                        {userEnrollments
+                          .filter(e => e.sessionDetails?.status === 'pending')
                           .slice(0, 3)
-                          .map(session => (
-                            <li key={session.id} className="py-4">
+                          .map(enrollment => (
+                            <li key={enrollment._id} className="py-4">
                               <div className="flex justify-between">
                                 <div>
-                                  <h4 className="text-sm font-medium text-gray-900">{session.title}</h4>
-                                  <p className="text-sm text-gray-500">{session.date} • {session.time}</p>
-                                  <p className="text-sm text-gray-500">Instructor: {session.instructor}</p>
+                                  <h4 className="text-sm font-medium text-gray-900">{enrollment.sessionDetails?.title || 'Untitled Session'}</h4>
+                                  <p className="text-sm text-gray-500">
+                                    {enrollment.sessionDetails?.date && new Date(enrollment.sessionDetails.date).toLocaleDateString()} • 
+                                    {enrollment.sessionDetails?.time}
+                                  </p>
+                                  <p className="text-sm text-gray-500">Location: {enrollment.sessionDetails?.location}</p>
                                 </div>
-                                <StatusBadge status={session.status} />
+                                <StatusBadge status={enrollment.status} />
                               </div>
                             </li>
                           ))}
@@ -509,140 +433,63 @@ const UserDashboard = () => {
                   </div>
                 </div>
               </div>
-              
-              {/* Progress Chart */}
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">Your Progress</h3>
-                  <div className="mt-5 h-64">
-                    <div className="h-full flex items-end">
-                      {sessions
-                        .filter(s => s.status === 'Completed')
-                        .map((session, index) => (
-                          <div key={index} className="flex flex-col items-center flex-1">
-                            <div className="w-full bg-indigo-100 rounded-t" style={{ height: `${session.marks}%` }}>
-                              <div 
-                                className="bg-gradient-to-t from-indigo-500 to-indigo-600 w-full h-full rounded-t"
-                                style={{ opacity: session.marks / 100 }}
-                              ></div>
-                            </div>
-                            <div className="text-xs font-medium text-gray-500 mt-2 truncate w-full text-center" title={session.title}>
-                              {session.title.split(' ')[0]}
-                            </div>
-                            <div className="text-xs font-bold text-gray-700">{session.marks}%</div>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
 
           {/* Profile Section */}
           {activeSection === 'profile' && (
             <div className="space-y-6">
-              {!showEditProfile && !showPasswordForm && !showDeleteConfirm && (
-                <>
-                  {/* Profile Information */}
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <div className="flex justify-between items-start">
-                        <div>
-                          <h3 className="text-lg font-medium leading-6 text-gray-900">Profile Information</h3>
-                          <p className="mt-1 max-w-2xl text-sm text-gray-500">Your personal details and account information.</p>
+              {!showEditProfile ? (
+                <div className="bg-white overflow-hidden shadow rounded-lg">
+                  <div className="px-4 py-5 sm:p-6">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-medium leading-6 text-gray-900">Profile Information</h3>
+                        <p className="mt-1 max-w-2xl text-sm text-gray-500">Your personal details and account information.</p>
+                      </div>
+                      <button
+                        onClick={() => {
+                          setShowEditProfile(true);
+                          setProfileForm({...user});
+                        }}
+                        className="flex items-center text-sm text-indigo-600 hover:text-indigo-500"
+                      >
+                        <Edit className="mr-1 h-4 w-4" />
+                        Edit Profile
+                      </button>
+                    </div>
+                    
+                    <div className="mt-5 border-t border-gray-200">
+                      <dl className="divide-y divide-gray-200">
+                        <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                          <dt className="text-sm font-medium text-gray-500">Full name</dt>
+                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{user.firstName} {user.lastName}</dd>
                         </div>
-                        <button
-                          onClick={() => {
-                            setShowEditProfile(true);
-                            setProfileForm({...currentUser});
-                          }}
-                          className="flex items-center text-sm text-indigo-600 hover:text-indigo-500"
-                        >
-                          <Edit className="mr-1 h-4 w-4" />
-                          Edit Profile
-                        </button>
-                      </div>
-                      
-                      <div className="mt-5 border-t border-gray-200">
-                        <dl className="divide-y divide-gray-200">
-                          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-                            <dt className="text-sm font-medium text-gray-500">Full name</dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{currentUser.firstName} {currentUser.lastName}</dd>
-                          </div>
-                          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-                            <dt className="text-sm font-medium text-gray-500">Username</dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{currentUser.username}</dd>
-                          </div>
-                          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-                            <dt className="text-sm font-medium text-gray-500">Email address</dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{currentUser.email}</dd>
-                          </div>
-                          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-                            <dt className="text-sm font-medium text-gray-500">Phone number</dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{currentUser.phoneNumber}</dd>
-                          </div>
-                          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-                            <dt className="text-sm font-medium text-gray-500">Address</dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{currentUser.address}</dd>
-                          </div>
-                          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-                            <dt className="text-sm font-medium text-gray-500">Gender</dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{currentUser.gender}</dd>
-                          </div>
-                          <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
-                            <dt className="text-sm font-medium text-gray-500">Enrolled date</dt>
-                            <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{currentUser.enrollDate}</dd>
-                          </div>
-                        </dl>
-                      </div>
+                        <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                          <dt className="text-sm font-medium text-gray-500">Username</dt>
+                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{user.username}</dd>
+                        </div>
+                        <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                          <dt className="text-sm font-medium text-gray-500">Email address</dt>
+                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{user.email}</dd>
+                        </div>
+                        <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                          <dt className="text-sm font-medium text-gray-500">Phone number</dt>
+                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{user.phoneNumber}</dd>
+                        </div>
+                        <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                          <dt className="text-sm font-medium text-gray-500">Address</dt>
+                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{user.address}</dd>
+                        </div>
+                        <div className="py-4 sm:grid sm:grid-cols-3 sm:gap-4">
+                          <dt className="text-sm font-medium text-gray-500">Gender</dt>
+                          <dd className="mt-1 text-sm text-gray-900 sm:mt-0 sm:col-span-2">{user.gender}</dd>
+                        </div>
+                      </dl>
                     </div>
                   </div>
-                  
-                  {/* Account Actions */}
-                  <div className="bg-white overflow-hidden shadow rounded-lg">
-                    <div className="px-4 py-5 sm:p-6">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">Account Actions</h3>
-                      <div className="mt-5 space-y-4">
-                        <div className="p-4 border border-gray-200 rounded-md">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-900">Change Password</h4>
-                              <p className="text-sm text-gray-500">Update your password for better security.</p>
-                            </div>
-                            <button
-                              onClick={() => setShowPasswordForm(true)}
-                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
-                            >
-                              <Lock className="mr-2 h-4 w-4" />
-                              Change
-                            </button>
-                          </div>
-                        </div>
-                        
-                        <div className="p-4 border border-gray-200 rounded-md">
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-900">Delete Account</h4>
-                              <p className="text-sm text-gray-500">Permanently delete your account and all data.</p>
-                            </div>
-                            <button
-                              onClick={() => setShowDeleteConfirm(true)}
-                              className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none"
-                            >
-                              <Trash2 className="mr-2 h-4 w-4" />
-                              Delete
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-              
-              {/* Edit Profile Form */}
-              {showEditProfile && (
+                </div>
+              ) : (
                 <div className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="px-4 py-5 sm:p-6">
                     <div className="flex justify-between items-center">
@@ -665,7 +512,7 @@ const UserDashboard = () => {
                           type="text"
                           name="firstName"
                           id="firstName"
-                          value={profileForm.firstName}
+                          value={profileForm.firstName || ''}
                           onChange={handleProfileChange}
                           className={`mt-1 block w-full border ${profileErrors.firstName ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                         />
@@ -680,7 +527,7 @@ const UserDashboard = () => {
                           type="text"
                           name="lastName"
                           id="lastName"
-                          value={profileForm.lastName}
+                          value={profileForm.lastName || ''}
                           onChange={handleProfileChange}
                           className={`mt-1 block w-full border ${profileErrors.lastName ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                         />
@@ -690,27 +537,12 @@ const UserDashboard = () => {
                       </div>
                       
                       <div className="sm:col-span-1">
-                        <label htmlFor="username" className="block text-sm font-medium text-gray-700">Username</label>
-                        <input
-                          type="text"
-                          name="username"
-                          id="username"
-                          value={profileForm.username}
-                          onChange={handleProfileChange}
-                          className={`mt-1 block w-full border ${profileErrors.username ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
-                        {profileErrors.username && (
-                          <p className="mt-1 text-sm text-red-600">{profileErrors.username}</p>
-                        )}
-                      </div>
-                      
-                      <div className="sm:col-span-1">
                         <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
                         <input
                           type="email"
                           name="email"
                           id="email"
-                          value={profileForm.email}
+                          value={profileForm.email || ''}
                           onChange={handleProfileChange}
                           className={`mt-1 block w-full border ${profileErrors.email ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                         />
@@ -725,7 +557,7 @@ const UserDashboard = () => {
                           type="text"
                           name="phoneNumber"
                           id="phoneNumber"
-                          value={profileForm.phoneNumber}
+                          value={profileForm.phoneNumber || ''}
                           onChange={handleProfileChange}
                           className={`mt-1 block w-full border ${profileErrors.phoneNumber ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                         />
@@ -739,14 +571,14 @@ const UserDashboard = () => {
                         <select
                           name="gender"
                           id="gender"
-                          value={profileForm.gender}
+                          value={profileForm.gender || ''}
                           onChange={handleProfileChange}
                           className={`mt-1 block w-full border ${profileErrors.gender ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
                         >
                           <option value="">Select gender</option>
                           <option value="Male">Male</option>
                           <option value="Female">Female</option>
-                          <option value="other">Other</option>
+                          <option value="Other">Other</option>
                         </select>
                         {profileErrors.gender && (
                           <p className="mt-1 text-sm text-red-600">{profileErrors.gender}</p>
@@ -758,7 +590,7 @@ const UserDashboard = () => {
                         <textarea
                           name="address"
                           id="address"
-                          value={profileForm.address}
+                          value={profileForm.address || ''}
                           onChange={handleProfileChange}
                           rows="3"
                           className={`mt-1 block w-full border ${profileErrors.address ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
@@ -792,429 +624,224 @@ const UserDashboard = () => {
                   </div>
                 </div>
               )}
-              
-              {/* Change Password Form */}
-              {showPasswordForm && (
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium leading-6 text-gray-900">Change Password</h3>
-                      <button 
-                        onClick={() => {
-                          setShowPasswordForm(false);
-                          setPasswordErrors({});
-                          setPasswordForm({
-                            currentPassword: '',
-                            newPassword: '',
-                            confirmPassword: ''
-                          });
-                        }}
-                        className="text-gray-500 hover:text-gray-700"
-                      >
-                        <X className="h-5 w-5" />
-                      </button>
-                    </div>
-                    
-                    <form onSubmit={handlePasswordChange} className="mt-5 space-y-6">
-                      <div>
-                        <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700">Current Password</label>
-                        <input
-                          type="password"
-                          name="currentPassword"
-                          id="currentPassword"
-                          value={passwordForm.currentPassword}
-                          onChange={handlePasswordFormChange}
-                          className={`mt-1 block w-full border ${passwordErrors.currentPassword ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
-                        {passwordErrors.currentPassword && (
-                          <p className="mt-1 text-sm text-red-600">{passwordErrors.currentPassword}</p>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700">New Password</label>
-                        <input
-                          type="password"
-                          name="newPassword"
-                          id="newPassword"
-                          value={passwordForm.newPassword}
-                          onChange={handlePasswordFormChange}
-                          className={`mt-1 block w-full border ${passwordErrors.newPassword ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
-                        {passwordErrors.newPassword && (
-                          <p className="mt-1 text-sm text-red-600">{passwordErrors.newPassword}</p>
-                        )}
-                      </div>
-                      
-                      <div>
-                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">Confirm New Password</label>
-                        <input
-                          type="password"
-                          name="confirmPassword"
-                          id="confirmPassword"
-                          value={passwordForm.confirmPassword}
-                          onChange={handlePasswordFormChange}
-                          className={`mt-1 block w-full border ${passwordErrors.confirmPassword ? 'border-red-300' : 'border-gray-300'} rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm`}
-                        />
-                        {passwordErrors.confirmPassword && (
-                          <p className="mt-1 text-sm text-red-600">{passwordErrors.confirmPassword}</p>
-                        )}
-                      </div>
-                      
-                      <div className="flex justify-end space-x-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowPasswordForm(false);
-                            setPasswordErrors({});
-                            setPasswordForm({
-                              currentPassword: '',
-                              newPassword: '',
-                              confirmPassword: ''
-                            });
-                          }}
-                          className="inline-flex justify-center py-2 px-4 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-                        >
-                          Change Password
-                        </button>
-                      </div>
-                    </form>
-                  </div>
-                </div>
-              )}
-              
-              {/* Delete Account Confirmation */}
-              {showDeleteConfirm && (
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="px-4 py-5 sm:p-6">
-                    <div className="sm:flex sm:items-start">
-                      <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                        <Trash2 className="h-6 w-6 text-red-600" />
-                      </div>
-                      <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                        <h3 className="text-lg leading-6 font-medium text-gray-900">Delete Account</h3>
-                        <div className="mt-2">
-                          <p className="text-sm text-gray-500">
-                            Are you sure you want to delete your account? All of your data will be permanently removed.
-                            This action cannot be undone.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
-                      <button
-                        type="button"
-                        onClick={handleDeleteAccount}
-                        className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
-                      >
-                        Delete
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowDeleteConfirm(false)}
-                        className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:w-auto sm:text-sm"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
           )}
           
           {/* Sessions Section */}
           {activeSection === 'sessions' && (
             <div className="space-y-6">
-              {/* Session Listing */}
+              {/* Enrolled Sessions */}
               <div className="bg-white overflow-hidden shadow rounded-lg">
                 <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">My Driving Sessions</h3>
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium leading-6 text-gray-900">My Enrolled Sessions</h3>
+                    <button
+                      onClick={() => setShowEnrollForm(true)}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
+                    >
+                      Enroll in Session
+                    </button>
+                  </div>
                   
                   <div className="mt-5">
-                    <div className="flex flex-col">
-                      <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                        <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                          <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Instructor</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Marks</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                {sessions.map((session) => (
-                                  <tr key={session.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="text-sm font-medium text-gray-900">{session.title}</div>
-                                      <div className="text-sm text-gray-500">ID: {session.id}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                      <div className="text-sm text-gray-900">{session.date}</div>
-                                      <div className="text-sm text-gray-500">{session.time}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{session.instructor}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                      <StatusBadge status={session.status} />
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                      {session.marks ? `${session.marks}/100` : '-'}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                      <button
-                                        className="text-indigo-600 hover:text-indigo-900"
-                                        onClick={() => {
-                                          // Here you would normally show session details
-                                          alert(`Session Feedback: ${session.feedback || 'No feedback available yet'}`);
-                                        }}
-                                      >
-                                        <Info className="h-5 w-5" />
-                                      </button>
-                                    </td>
+                    {enrollmentsLoading ? (
+                      <p className="text-center py-4 text-gray-500">Loading your enrollments...</p>
+                    ) : userEnrollments.length > 0 ? (
+                      <div className="flex flex-col">
+                        <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                          <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
+                            <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
+                              <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                  <tr>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Session</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date & Time</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                  {userEnrollments.map((enrollment) => (
+                                    <tr key={enrollment._id}>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-gray-900">
+                                          {enrollment.sessionDetails?.title || 'Untitled Session'}
+                                        </div>
+                                        <div className="text-sm text-gray-500">Type: {enrollment.enrollmentType || 'Standard'}</div>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-gray-900">
+                                          {enrollment.sessionDetails?.date && new Date(enrollment.sessionDetails.date).toLocaleDateString()}
+                                        </div>
+                                        <div className="text-sm text-gray-500">{enrollment.sessionDetails?.time}</div>
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                        {enrollment.sessionDetails?.location}
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap">
+                                        <StatusBadge status={enrollment.status} />
+                                      </td>
+                                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                        {enrollment.status !== 'completed' && (
+                                          <button
+                                            onClick={() => handleUnenrollSession(enrollment._id)}
+                                            className="text-red-600 hover:text-red-900"
+                                            title="Cancel Enrollment"
+                                          >
+                                            <Trash2 className="h-5 w-5" />
+                                          </button>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">You are not enrolled in any sessions yet.</p>
+                        <button
+                          onClick={() => setShowEnrollForm(true)}
+                          className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-indigo-700 bg-indigo-100 hover:bg-indigo-200"
+                        >
+                          Enroll Now
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
               
-              {/* Performance Summary */}
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">Performance Summary</h3>
-                  
-                  <div className="mt-5">
-                    <dl className="grid grid-cols-1 gap-x-4 gap-y-8 sm:grid-cols-2">
-                      <div className="sm:col-span-1">
-                        <dt className="text-sm font-medium text-gray-500">Average Score</dt>
-                        <dd className="mt-1 text-3xl font-semibold text-gray-900">{averageScore.toFixed(1)}/100</dd>
-                      </div>
-                      <div className="sm:col-span-1">
-                        <dt className="text-sm font-medium text-gray-500">Sessions Completed</dt>
-                        <dd className="mt-1 text-3xl font-semibold text-gray-900">{completedSessions}/{sessions.length}</dd>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <dt className="text-sm font-medium text-gray-500">Instructor Feedback Summary</dt>
-                        <dd className="mt-1 text-sm text-gray-900">
-                          <ul className="border border-gray-200 rounded-md divide-y divide-gray-200">
-                            {sessions
-                              .filter(s => s.feedback)
-                              .map((session) => (
-                                <li key={session.id} className="pl-3 pr-4 py-3 flex items-center justify-between text-sm">
-                                  <div className="w-0 flex-1 flex items-center">
-                                    <span className="ml-2 flex-1 w-0 truncate font-medium">{session.title}</span>
-                                  </div>
-                                  <div className="ml-4 flex-shrink-0">
-                                    <span className="text-gray-500">{session.feedback}</span>
-                                  </div>
-                                </li>
-                              ))}
-                          </ul>
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Reports Section */}
-          {activeSection === 'reports' && (
-            <div className="space-y-6">
-              {/* Report Generator */}
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">Generate Performance Reports</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    Choose a report type to generate a detailed PDF of your driving progress.
-                  </p>
-                  
-                  <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                    <div className="bg-gray-50 overflow-hidden rounded-lg border border-gray-200">
-                      <div className="px-4 py-5 sm:p-6">
-                        <h4 className="text-base font-medium text-gray-900">Progress Report</h4>
-                        <p className="mt-1 text-sm text-gray-500">
-                          A detailed report of your scores and progress over time.
-                        </p>
-                        <div className="mt-4">
-                          <button
-                            onClick={() => generateReport('Progress')}
-                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Generate
-                          </button>
-                        </div>
-                      </div>
+              {/* Session Enrollment Modal */}
+              {showEnrollForm && (
+                <div className="fixed inset-0 overflow-y-auto z-50">
+                  <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                    <div className="fixed inset-0 transition-opacity">
+                      <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
                     </div>
                     
-                    <div className="bg-gray-50 overflow-hidden rounded-lg border border-gray-200">
-                      <div className="px-4 py-5 sm:p-6">
-                        <h4 className="text-base font-medium text-gray-900">Feedback Summary</h4>
-                        <p className="mt-1 text-sm text-gray-500">
-                          A compilation of all instructor feedback and comments.
-                        </p>
-                        <div className="mt-4">
-                          <button
-                            onClick={() => generateReport('Feedback')}
-                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Generate
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                    <span className="hidden sm:inline-block sm:align-middle sm:h-screen">&#8203;</span>
                     
-                    <div className="bg-gray-50 overflow-hidden rounded-lg border border-gray-200">
-                      <div className="px-4 py-5 sm:p-6">
-                        <h4 className="text-base font-medium text-gray-900">Comprehensive Report</h4>
-                        <p className="mt-1 text-sm text-gray-500">
-                          Full report with attendance, scores, feedback, and recommendations.
-                        </p>
-                        <div className="mt-4">
-                          <button
-                            onClick={() => generateReport('Comprehensive')}
-                            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
-                          >
-                            <Download className="mr-2 h-4 w-4" />
-                            Generate
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Report History */}
-              <div className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="px-4 py-5 sm:p-6">
-                  <h3 className="text-lg font-medium leading-6 text-gray-900">Report History</h3>
-                  
-                  <div className="mt-5">
-                    <div className="flex flex-col">
-                      <div className="-my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                        <div className="py-2 align-middle inline-block min-w-full sm:px-6 lg:px-8">
-                          <div className="shadow overflow-hidden border-b border-gray-200 sm:rounded-lg">
-                            <table className="min-w-full divide-y divide-gray-200">
-                              <thead className="bg-gray-50">
-                                <tr>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Report Name</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Generated Date</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Download</th>
-                                </tr>
-                              </thead>
-                              <tbody className="bg-white divide-y divide-gray-200">
-                                <tr>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">March Progress Report</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2024-03-15</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Progress</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <button className="text-indigo-600 hover:text-indigo-900">
-                                      <Download className="h-5 w-5" />
-                                    </button>
-                                  </td>
-                                </tr>
-                                <tr>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">February Summary</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">2024-02-28</td>
-                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">Comprehensive</td>
-                                  <td className="px-6 py-4 whitespace-nowrap">
-                                    <button className="text-indigo-600 hover:text-indigo-900">
-                                      <Download className="h-5 w-5" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              </tbody>
-                            </table>
+                    <div className="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full sm:p-6">
+                      <div className="sm:flex sm:items-start">
+                        <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                          <h3 className="text-lg leading-6 font-medium text-gray-900">
+                            Enroll in a Session
+                          </h3>
+                          <div className="mt-2">
+                            <p className="text-sm text-gray-500">
+                              Select a training session from the list below to enroll.
+                            </p>
+                          </div>
+                          
+                          <div className="mt-4">
+                            {sessionsLoading ? (
+                              <p className="text-gray-500">Loading available sessions...</p>
+                            ) : sessionsError ? (
+                              <div className="rounded-md bg-red-50 p-4">
+                                <div className="flex">
+                                  <div className="flex-shrink-0">
+                                    <AlertTriangle className="h-5 w-5 text-red-400" aria-hidden="true" />
+                                  </div>
+                                  <div className="ml-3">
+                                    <h3 className="text-sm font-medium text-red-800">
+                                      Error loading sessions
+                                    </h3>
+                                    <div className="mt-2 text-sm text-red-700">
+                                      <p>{sessionsError}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : availableSessions.filter(s => s.status === 'pending').length > 0 ? (
+                              <div className="mt-2 space-y-2">
+                                {availableSessions
+                                  .filter(s => s.status === 'pending')
+                                  .map(session => {
+                                    // Check if user is already enrolled in this session
+                                    const isEnrolled = userEnrollments.some(
+                                      e => e.sessionId === session.sessionID
+                                    );
+                                    
+                                    return (
+                                      <div key={session.sessionID} className="p-3 border border-gray-200 rounded-md">
+                                        <div className="flex justify-between items-center">
+                                          <div>
+                                            <p className="text-sm font-medium text-gray-900">{session.title || 'Untitled Session'}</p>
+                                            <p className="text-xs text-gray-500">
+                                              {new Date(session.date).toLocaleDateString()} • {session.time}
+                                            </p>
+                                            <p className="text-xs text-gray-500">
+                                              Location: {session.location} • Instructor: {session.instructorName || session.instructorID}
+                                            </p>
+                                            <p className="text-xs text-gray-500">
+                                              {session.currentCount}/{session.maxCount} students enrolled
+                                            </p>
+                                          </div>
+                                          <div>
+                                            {isEnrolled ? (
+                                              <span className="px-2 py-1 bg-green-100 text-green-800 text-xs rounded-md">
+                                                Already Enrolled
+                                              </span>
+                                            ) : (
+                                              <button
+                                                onClick={() => setSelectedSessionId(session.sessionID)}
+                                                className={`px-3 py-1 text-xs font-medium rounded-md ${
+                                                  selectedSessionId === session.sessionID
+                                                    ? 'bg-indigo-600 text-white'
+                                                    : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                                                }`}
+                                              >
+                                                {selectedSessionId === session.sessionID ? 'Selected' : 'Select'}
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                              </div>
+                            ) : (
+                              <p className="text-center py-4 text-gray-500">No available sessions found.</p>
+                            )}
                           </div>
                         </div>
                       </div>
+                      <div className="mt-5 sm:mt-4 sm:flex sm:flex-row-reverse">
+                        <button
+                          type="button"
+                          disabled={!selectedSessionId}
+                          onClick={handleEnrollSession}
+                          className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm ${
+                            !selectedSessionId ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          Enroll
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setShowEnrollForm(false);
+                            setSelectedSessionId(null);
+                          }}
+                          className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:w-auto sm:text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
           
           {/* AI Assistant Section */}
-          {activeSection === 'assistant' && (
-            <div className="bg-white overflow-hidden shadow rounded-lg">
-              <div className="px-4 py-5 sm:p-6 flex flex-col h-full">
-                <h3 className="text-lg font-medium leading-6 text-gray-900">AI Driving Assistant</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  Ask questions about your driving lessons, progress, or account.
-                </p>
-                
-                <div className="mt-5 flex-1 overflow-y-auto border border-gray-200 rounded-md p-4 flex flex-col space-y-4 h-96">
-                  {chatMessages.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-3/4 p-3 rounded-lg ${
-                          message.role === 'user'
-                            ? 'bg-indigo-100 text-indigo-900'
-                            : 'bg-gray-100 text-gray-900'
-                        }`}
-                      >
-                        <p className="text-sm">{message.content}</p>
-                      </div>
-                    </div>
-                  ))}
-                  {isTyping && (
-                    <div className="flex justify-start">
-                      <div className="max-w-3/4 p-3 rounded-lg bg-gray-100 text-gray-900">
-                        <p className="text-sm">Typing...</p>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="mt-4">
-                  <div className="flex">
-                    <input
-                      type="text"
-                      value={userMessage}
-                      onChange={(e) => setUserMessage(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && sendMessage()}
-                      className="flex-1 border border-gray-300 rounded-l-md py-2 px-4 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                      placeholder="Type your message..."
-                    />
-                    <button
-                      onClick={sendMessage}
-                      className="bg-indigo-600 text-white rounded-r-md px-4 py-2 hover:bg-indigo-700 focus:outline-none"
-                    >
-                      <Send className="h-5 w-5" />
-                    </button>
-                  </div>
-                  <p className="mt-2 text-xs text-gray-500">
-                    Powered by OpenAI. Try asking about your upcoming lessons, progress, or account settings.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
+          {activeSection === 'assistant' && <ChatBot />}
         </main>
       </div>
     </div>
