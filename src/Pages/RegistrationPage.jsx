@@ -1,7 +1,11 @@
 import React, { useState } from 'react';
-import { User, Mail, Phone, MapPin, Lock, ArrowLeft, Check } from 'lucide-react';
+import { User, Mail, Phone, MapPin, Lock, ArrowLeft, Check, AlertTriangle } from 'lucide-react';
+import axiosInstance from '../lib/axiosInstance';
+import { useNavigate } from 'react-router-dom';
 
 const RegistrationPage = () => {
+  const navigate = useNavigate();
+  
   const [registrationForm, setRegistrationForm] = useState({
     firstName: '',
     lastName: '',
@@ -19,6 +23,7 @@ const RegistrationPage = () => {
   const [errors, setErrors] = useState({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [apiError, setApiError] = useState('');
   
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -26,6 +31,19 @@ const RegistrationPage = () => {
       ...registrationForm,
       [name]: type === 'checkbox' ? checked : value
     });
+    
+    // Clear field-specific error when user starts typing
+    if (errors[name]) {
+      setErrors({
+        ...errors,
+        [name]: ''
+      });
+    }
+    
+    // Clear API error when user makes any change
+    if (apiError) {
+      setApiError('');
+    }
   };
   
   const validateForm = () => {
@@ -73,20 +91,16 @@ const RegistrationPage = () => {
     return Object.keys(newErrors).length === 0;
   };
   
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     
     if (validateForm()) {
       setIsLoading(true);
+      setApiError('');
       
-      // Simulate API call to register user
-      setTimeout(() => {
-        setIsLoading(false);
-        setIsSuccess(true);
-        
-        // Prepare the form data that would be sent to the backend
+      try {
+        // Prepare the form data to send to the backend
         const userData = {
-          userID:'ID001', // Generate a random ID (in real app, backend would do this)
           firstName: registrationForm.firstName,
           lastName: registrationForm.lastName,
           username: registrationForm.username,
@@ -94,17 +108,61 @@ const RegistrationPage = () => {
           phoneNumber: registrationForm.phoneNumber,
           address: registrationForm.address,
           gender: registrationForm.gender,
-          password: registrationForm.password, // In a real app, this would be hashed on the backend
+          password: registrationForm.password,
           isStudent: registrationForm.isStudent
         };
         
-        console.log('Registration data that would be sent to API:', userData);
+        // Make API call to register endpoint
+        const response = await axiosInstance.post('/auth/register', userData);
         
-        // After successful registration, wait 2 seconds then redirect to login
-        setTimeout(() => {
-          window.location.href = '/login';
-        }, 2000);
-      }, 1500);
+        // If successful, set success state
+        if (response.data.success) {
+          setIsSuccess(true);
+          
+          // Store the token from the response if needed
+          if (response.data.token) {
+            localStorage.setItem('token', response.data.token);
+          }
+          
+          // After successful registration, wait 2 seconds then redirect to login
+          setTimeout(() => {
+            navigate('/login');
+          }, 2000);
+        }
+      } catch (error) {
+        // Handle API errors
+        console.error('Registration error:', error);
+        
+        if (error.response) {
+          // The server responded with a status code outside the 2xx range
+          const { data } = error.response;
+          setApiError(data.message || 'Registration failed. Please try again.');
+          
+          // If error mentions existing email, set specific field error
+          if (data.message && data.message.includes('email')) {
+            setErrors({
+              ...errors,
+              email: 'This email is already registered'
+            });
+          }
+          
+          // If error mentions existing username, set specific field error
+          if (data.message && data.message.includes('username')) {
+            setErrors({
+              ...errors,
+              username: 'This username is already taken'
+            });
+          }
+        } else if (error.request) {
+          // The request was made but no response was received
+          setApiError('No response from server. Please check your internet connection.');
+        } else {
+          // Something happened in setting up the request
+          setApiError('An error occurred. Please try again later.');
+        }
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
   
@@ -136,6 +194,23 @@ const RegistrationPage = () => {
             </div>
           ) : (
             <form className="space-y-6" onSubmit={handleSubmit}>
+              {/* API Error Message */}
+              {apiError && (
+                <div className="rounded-md bg-red-50 p-4">
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <AlertTriangle className="h-5 w-5 text-red-400" />
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">Registration Error</h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p>{apiError}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-1 gap-y-6 gap-x-4 sm:grid-cols-2">
                 <div>
                   <label htmlFor="firstName" className="block text-sm font-medium text-gray-700">
@@ -298,7 +373,7 @@ const RegistrationPage = () => {
                   <option value="">Select gender</option>
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
-                  <option value="other">Other</option>
+                  <option value="Other">Other</option>
                 </select>
                 {errors.gender && (
                   <p className="mt-2 text-sm text-red-600">{errors.gender}</p>
@@ -353,6 +428,23 @@ const RegistrationPage = () => {
                 {errors.confirmPassword && (
                   <p className="mt-2 text-sm text-red-600">{errors.confirmPassword}</p>
                 )}
+              </div>
+
+              <div>
+                <div className="flex items-center">
+                  <input
+                    id="isStudent"
+                    name="isStudent"
+                    type="checkbox"
+                    checked={registrationForm.isStudent}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="isStudent" className="ml-2 block text-sm text-gray-900">
+                    Register as a student
+                  </label>
+                </div>
+                <p className="mt-1 text-xs text-gray-500">Uncheck if you're registering as an instructor</p>
               </div>
 
               <div className="flex items-center">
@@ -425,3 +517,4 @@ const RegistrationPage = () => {
 };
 
 export default RegistrationPage;
+//updated
